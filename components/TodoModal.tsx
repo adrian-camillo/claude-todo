@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { supabase, type Todo, type TodoAlert, type TodoComment } from '@/lib/supabase'
+import { supabase, type Todo, type TodoAlert, type TodoComment, type TodoSubtask } from '@/lib/supabase'
 import { notifyWebhook, notifyWebhookPayload } from '@/lib/webhook'
 
 type TodoModalProps = {
@@ -32,18 +32,23 @@ export default function TodoModal({ todo, allTodos, onClose, onSave }: TodoModal
   const [comments, setComments] = useState<TodoComment[]>([])
   const [commentInput, setCommentInput] = useState('')
   const [savingComment, setSavingComment] = useState(false)
+  const [subtasks, setSubtasks] = useState<TodoSubtask[]>([])
+  const [subtaskInput, setSubtaskInput] = useState('')
+  const [savingSubtask, setSavingSubtask] = useState(false)
   const [saving, setSaving] = useState(false)
   const overlayRef = useRef<HTMLDivElement>(null)
 
   // Load alerts and dependencies
   useEffect(() => {
     async function load() {
-      const [alertsRes, depsRes, commentsRes] = await Promise.all([
+      const [alertsRes, depsRes, commentsRes, subtasksRes] = await Promise.all([
         supabase.from('todo_alerts').select('*').eq('todo_id', todo.id).order('created_at'),
         supabase.from('todo_dependencies').select('depends_on_id').eq('todo_id', todo.id),
         supabase.from('todo_comments').select('*').eq('todo_id', todo.id).order('created_at'),
+        supabase.from('todo_subtasks').select('*').eq('todo_id', todo.id).order('created_at'),
       ])
       setCommentInput('')
+      setSubtaskInput('')
       if (alertsRes.data) {
         setAlerts(
           alertsRes.data.map((alert: TodoAlert) => ({
@@ -55,6 +60,7 @@ export default function TodoModal({ todo, allTodos, onClose, onSave }: TodoModal
       }
       if (depsRes.data) setDependencies(depsRes.data.map((d: { depends_on_id: string }) => d.depends_on_id))
       if (commentsRes.data) setComments(commentsRes.data as TodoComment[])
+      if (subtasksRes.data) setSubtasks(subtasksRes.data as TodoSubtask[])
     }
     load()
   }, [todo.id])
@@ -113,6 +119,35 @@ export default function TodoModal({ todo, allTodos, onClose, onSave }: TodoModal
       })
     }
     setSavingComment(false)
+  }
+
+  async function handleAddSubtask() {
+    const content = subtaskInput.trim()
+    if (!content) return
+    setSavingSubtask(true)
+    const { data, error } = await supabase
+      .from('todo_subtasks')
+      .insert({ todo_id: todo.id, content })
+      .select()
+      .single()
+    if (!error && data) {
+      setSubtasks(prev => [...prev, data as TodoSubtask])
+      setSubtaskInput('')
+    }
+    setSavingSubtask(false)
+  }
+
+  async function toggleSubtask(subtask: TodoSubtask) {
+    const nextCompleted = !subtask.completed
+    const { data, error } = await supabase
+      .from('todo_subtasks')
+      .update({ completed: nextCompleted, completed_at: nextCompleted ? new Date().toISOString() : null })
+      .eq('id', subtask.id)
+      .select()
+      .single()
+    if (!error && data) {
+      setSubtasks(prev => prev.map(s => s.id === subtask.id ? data as TodoSubtask : s))
+    }
   }
 
   async function handleSave() {
@@ -343,6 +378,48 @@ export default function TodoModal({ todo, allTodos, onClose, onSave }: TodoModal
                     <span className="comment-text">{comment.content}</span>
                     <span className="comment-date">{new Date(comment.created_at).toLocaleString('es-AR')}</span>
                   </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Subtasks */}
+          <div className="modal-section">
+            <div className="modal-section-header">
+              <label className="modal-label">Subtareas</label>
+            </div>
+            <div className="comment-input-row">
+              <input
+                type="text"
+                className="modal-input"
+                value={subtaskInput}
+                onChange={e => setSubtaskInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAddSubtask()}
+                placeholder="Agregar subtarea..."
+              />
+              <button
+                className="btn-add-small"
+                onClick={handleAddSubtask}
+                disabled={savingSubtask || !subtaskInput.trim()}
+              >
+                {savingSubtask ? 'Guardando...' : 'Agregar'}
+              </button>
+            </div>
+            {subtasks.length === 0 ? (
+              <p className="modal-empty-hint">Aun sin subtareas</p>
+            ) : (
+              <div className="subtask-list">
+                {subtasks.map(subtask => (
+                  <label key={subtask.id} className="subtask-item">
+                    <input
+                      type="checkbox"
+                      checked={subtask.completed}
+                      onChange={() => toggleSubtask(subtask)}
+                    />
+                    <span className={subtask.completed ? 'subtask-text completed' : 'subtask-text'}>
+                      {subtask.content}
+                    </span>
+                  </label>
                 ))}
               </div>
             )}

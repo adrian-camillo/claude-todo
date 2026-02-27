@@ -34,6 +34,15 @@ export type TodoComment = {
   created_at: string
 }
 
+export type TodoSubtask = {
+  id: string
+  todo_id: string
+  content: string
+  completed: boolean
+  created_at: string
+  completed_at: string | null
+}
+
 export type TodoDependency = {
   todo_id: string
   depends_on_id: string

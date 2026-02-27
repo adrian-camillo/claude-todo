@@ -338,6 +338,26 @@ body {
 .comment-text { font-size: 13px; color: var(--claude-text); }
 .comment-date { font-size: 11px; color: var(--claude-text-muted); }
 
+/* Subtasks */
+.subtask-list {
+  border: 1.5px solid var(--claude-border);
+  border-radius: var(--radius-sm);
+  background: var(--claude-bg);
+  display: flex; flex-direction: column;
+}
+.subtask-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px;
+  cursor: pointer;
+  transition: background var(--transition);
+  border-bottom: 1px solid var(--claude-border);
+}
+.subtask-item:last-child { border-bottom: none; }
+.subtask-item:hover { background: var(--claude-bg-warm); }
+.subtask-item input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--claude-terracotta); }
+.subtask-text { flex: 1; font-size: 13px; color: var(--claude-text); }
+.subtask-text.completed { text-decoration: line-through; color: var(--claude-text-muted); }
+
 /* Dependencies */
 .dep-list {
   border: 1.5px solid var(--claude-border); border-radius: var(--radius-sm);
