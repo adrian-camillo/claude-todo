@@ -152,6 +152,13 @@ export default function TodoModal({ todo, allTodos, onClose, onSave }: TodoModal
       })
       const json = await res.json()
       if (!res.ok || !Array.isArray(json.subtasks) || json.subtasks.length === 0) {
+        console.error('AI subtasks error', {
+          status: res.status,
+          response: json,
+          errorBody: json?.body ?? null,
+          reason: json?.reason ?? null,
+          detail: json?.detail ?? null,
+        })
         setGenerateError('No se pudieron generar subtareas')
         setGeneratingSubtasks(false)
         return
@@ -169,7 +176,8 @@ export default function TodoModal({ todo, allTodos, onClose, onSave }: TodoModal
           setSubtasks(prev => [...prev, ...(data as TodoSubtask[])])
         }
       }
-    } catch {
+    } catch (err) {
+      console.error('AI subtasks exception', err)
       setGenerateError('Error al generar subtareas')
     }
     setGeneratingSubtasks(false)

@@ -28,7 +28,11 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error || !data?.value) {
-    return NextResponse.json({ ok: false, reason: 'no_openai_key' }, { status: 400 })
+    return NextResponse.json({
+      ok: false,
+      reason: 'no_openai_key',
+      detail: error?.message ?? null,
+    }, { status: 400 })
   }
 
   const prompt = [
@@ -52,19 +56,19 @@ export async function POST(req: NextRequest) {
             role: 'system',
             content: [
               {
-                type: 'text',
+                type: 'input_text',
                 text: 'Eres un asistente que convierte descripciones de tareas en subtareas concretas. Responde solo JSON valido.',
               },
             ],
           },
           {
             role: 'user',
-            content: [{ type: 'text', text: prompt }],
+            content: [{ type: 'input_text', text: prompt }],
           },
         ],
-        response_format: {
-          type: 'json_schema',
-          json_schema: {
+        text: {
+          format: {
+            type: 'json_schema',
             name: 'subtasks_schema',
             schema: {
               type: 'object',
@@ -83,7 +87,14 @@ export async function POST(req: NextRequest) {
     })
 
     if (!res.ok) {
-      return NextResponse.json({ ok: false, reason: 'openai_error' }, { status: 500 })
+      const text = await res.text()
+      console.error('OpenAI error', { status: res.status, body: text })
+      return NextResponse.json({
+        ok: false,
+        reason: 'openai_error',
+        status: res.status,
+        body: text,
+      }, { status: res.status })
     }
 
     const json = await res.json()
@@ -99,6 +110,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, subtasks })
   } catch (err) {
-    return NextResponse.json({ ok: false, reason: String(err) }, { status: 500 })
+    console.error('OpenAI exception', err)
+    return NextResponse.json({ ok: false, reason: 'exception', detail: String(err) }, { status: 500 })
   }
 }
