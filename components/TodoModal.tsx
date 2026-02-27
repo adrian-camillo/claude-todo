@@ -35,6 +35,8 @@ export default function TodoModal({ todo, allTodos, onClose, onSave }: TodoModal
   const [subtasks, setSubtasks] = useState<TodoSubtask[]>([])
   const [subtaskInput, setSubtaskInput] = useState('')
   const [savingSubtask, setSavingSubtask] = useState(false)
+  const [generatingSubtasks, setGeneratingSubtasks] = useState(false)
+  const [generateError, setGenerateError] = useState('')
   const [saving, setSaving] = useState(false)
   const overlayRef = useRef<HTMLDivElement>(null)
 
@@ -135,6 +137,42 @@ export default function TodoModal({ todo, allTodos, onClose, onSave }: TodoModal
       setSubtaskInput('')
     }
     setSavingSubtask(false)
+  }
+
+  async function handleGenerateSubtasks() {
+    const desc = description.trim()
+    if (!desc) return
+    setGeneratingSubtasks(true)
+    setGenerateError('')
+    try {
+      const res = await fetch('/api/subtasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: desc, title: text.trim() }),
+      })
+      const json = await res.json()
+      if (!res.ok || !Array.isArray(json.subtasks) || json.subtasks.length === 0) {
+        setGenerateError('No se pudieron generar subtareas')
+        setGeneratingSubtasks(false)
+        return
+      }
+      const newItems = json.subtasks
+        .map((s: string) => String(s).trim())
+        .filter(Boolean)
+
+      if (newItems.length > 0) {
+        const { data, error } = await supabase
+          .from('todo_subtasks')
+          .insert(newItems.map((content: string) => ({ todo_id: todo.id, content })))
+          .select()
+        if (!error && data) {
+          setSubtasks(prev => [...prev, ...(data as TodoSubtask[])])
+        }
+      }
+    } catch {
+      setGenerateError('Error al generar subtareas')
+    }
+    setGeneratingSubtasks(false)
   }
 
   async function toggleSubtask(subtask: TodoSubtask) {
@@ -404,6 +442,18 @@ export default function TodoModal({ todo, allTodos, onClose, onSave }: TodoModal
               >
                 {savingSubtask ? 'Guardando...' : 'Agregar'}
               </button>
+            </div>
+            <div className="subtask-ai-row">
+              <button
+                className="btn-add-small"
+                onClick={handleGenerateSubtasks}
+                disabled={generatingSubtasks || !description.trim()}
+              >
+                {generatingSubtasks ? 'Generando...' : 'Generar con IA'}
+              </button>
+              {generateError && (
+                <span className="modal-error-text">{generateError}</span>
+              )}
             </div>
             {subtasks.length === 0 ? (
               <p className="modal-empty-hint">Aun sin subtareas</p>

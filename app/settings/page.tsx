@@ -8,17 +8,22 @@ type TestStatus = 'idle' | 'testing' | 'ok' | 'error'
 
 export default function SettingsPage() {
   const [webhookUrl, setWebhookUrl] = useState('')
+  const [openaiKey, setOpenaiKey] = useState('')
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
+  const [openaiSaveStatus, setOpenaiSaveStatus] = useState<SaveStatus>('idle')
   const [testStatus, setTestStatus] = useState<TestStatus>('idle')
 
   useEffect(() => {
     supabase
       .from('app_config')
-      .select('value')
-      .eq('key', 'webhook_url')
-      .single()
+      .select('key, value')
+      .in('key', ['webhook_url', 'openai_api_key'])
       .then(({ data }) => {
-        if (data?.value) setWebhookUrl(data.value)
+        if (!data) return
+        const webhook = data.find(item => item.key === 'webhook_url')
+        const openai = data.find(item => item.key === 'openai_api_key')
+        if (webhook?.value) setWebhookUrl(webhook.value)
+        if (openai?.value) setOpenaiKey(openai.value)
       })
   }, [])
 
@@ -29,6 +34,15 @@ export default function SettingsPage() {
       .upsert({ key: 'webhook_url', value: webhookUrl.trim() })
     setSaveStatus(error ? 'error' : 'saved')
     setTimeout(() => setSaveStatus('idle'), 3000)
+  }
+
+  async function handleSaveOpenAI() {
+    setOpenaiSaveStatus('saving')
+    const { error } = await supabase
+      .from('app_config')
+      .upsert({ key: 'openai_api_key', value: openaiKey.trim() })
+    setOpenaiSaveStatus(error ? 'error' : 'saved')
+    setTimeout(() => setOpenaiSaveStatus('idle'), 3000)
   }
 
   async function handleTest() {
@@ -219,6 +233,103 @@ export default function SettingsPage() {
             )}
             {testStatus === 'error' && (
               <span style={{ fontSize: '12px', color: 'var(--claude-danger)', fontWeight: 500 }}>Sin respuesta ✗</span>
+            )}
+          </div>
+        </div>
+
+        <div style={{
+          background: 'var(--claude-surface)',
+          border: '1px solid var(--claude-border)',
+          borderRadius: 'var(--radius-md)',
+          padding: '20px',
+          boxShadow: 'var(--shadow-sm)',
+          marginTop: '16px',
+        }}>
+          <h2 style={{
+            fontSize: '14px',
+            fontWeight: 600,
+            color: 'var(--claude-text)',
+            marginBottom: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M8 1.5C4.4 1.5 1.5 4.4 1.5 8C1.5 11.6 4.4 14.5 8 14.5C11.6 14.5 14.5 11.6 14.5 8C14.5 4.4 11.6 1.5 8 1.5Z" stroke="var(--claude-terracotta)" strokeWidth="1.3"/>
+              <path d="M5.2 6.7C5.7 5.6 6.8 4.9 8.1 4.9C9.7 4.9 10.9 5.9 10.9 7.3C10.9 8.5 10.1 9.1 9.3 9.6C8.6 10 8.3 10.3 8.3 11" stroke="var(--claude-terracotta)" strokeWidth="1.3" strokeLinecap="round"/>
+              <circle cx="8.3" cy="12.5" r="0.8" fill="var(--claude-terracotta)"/>
+            </svg>
+            OpenAI API
+          </h2>
+
+          <p style={{
+            fontSize: '12px',
+            color: 'var(--claude-text-muted)',
+            marginBottom: '12px',
+            lineHeight: '1.5',
+          }}>
+            Se usa para generar subtareas automaticamente desde la descripcion.
+          </p>
+
+          <label style={{
+            display: 'block',
+            fontSize: '12px',
+            fontWeight: 500,
+            color: 'var(--claude-text-soft)',
+            marginBottom: '6px',
+          }}>
+            API Key de OpenAI
+          </label>
+
+          <input
+            type="password"
+            value={openaiKey}
+            onChange={e => setOpenaiKey(e.target.value)}
+            placeholder="sk-..."
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              border: '1px solid var(--claude-border)',
+              borderRadius: 'var(--radius-sm)',
+              background: 'var(--claude-bg)',
+              color: 'var(--claude-text)',
+              fontSize: '13px',
+              fontFamily: 'inherit',
+              outline: 'none',
+              transition: 'border-color var(--transition)',
+              marginBottom: '12px',
+              boxSizing: 'border-box',
+            }}
+            onFocus={e => (e.currentTarget.style.borderColor = 'var(--claude-terracotta)')}
+            onBlur={e => (e.currentTarget.style.borderColor = 'var(--claude-border)')}
+          />
+
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              onClick={handleSaveOpenAI}
+              disabled={openaiSaveStatus === 'saving'}
+              style={{
+                padding: '8px 16px',
+                background: 'var(--claude-terracotta)',
+                color: 'white',
+                border: 'none',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '13px',
+                fontWeight: 500,
+                fontFamily: 'inherit',
+                cursor: openaiSaveStatus === 'saving' ? 'not-allowed' : 'pointer',
+                opacity: openaiSaveStatus === 'saving' ? 0.7 : 1,
+                transition: 'opacity var(--transition)',
+              }}
+            >
+              {openaiSaveStatus === 'saving' ? 'Guardando...' : 'Guardar'}
+            </button>
+
+            {openaiSaveStatus === 'saved' && (
+              <span style={{ fontSize: '12px', color: '#4CAF7D', fontWeight: 500 }}>Guardado ✓</span>
+            )}
+            {openaiSaveStatus === 'error' && (
+              <span style={{ fontSize: '12px', color: 'var(--claude-danger)', fontWeight: 500 }}>Error al guardar ✗</span>
             )}
           </div>
         </div>

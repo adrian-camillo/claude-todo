@@ -357,6 +357,8 @@ body {
 .subtask-item input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--claude-terracotta); }
 .subtask-text { flex: 1; font-size: 13px; color: var(--claude-text); }
 .subtask-text.completed { text-decoration: line-through; color: var(--claude-text-muted); }
+.subtask-ai-row { display: flex; gap: 10px; align-items: center; margin-top: 6px; }
+.modal-error-text { font-size: 12px; color: var(--claude-danger); font-weight: 500; }
 
 /* Dependencies */
 .dep-list {
