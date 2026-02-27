@@ -1,6 +1,6 @@
 import { type Todo } from './supabase'
 
-type WebhookEvent = 'todo.created' | 'todo.updated' | 'todo.test'
+type WebhookEvent = 'todo.created' | 'todo.updated' | 'todo.test' | 'comment.created'
 
 type FieldChange = { from: unknown; to: unknown }
 
@@ -38,6 +38,19 @@ export function notifyWebhook(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ event, todo, changes }),
+  }).catch(() => {
+    // fire-and-forget: ignore errors silently
+  })
+}
+
+export function notifyWebhookPayload(
+  event: WebhookEvent,
+  payload: Record<string, unknown>
+): void {
+  fetch('/api/webhook', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ event, ...payload }),
   }).catch(() => {
     // fire-and-forget: ignore errors silently
   })

@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { supabase, type Todo, type TodoAlert } from '@/lib/supabase'
-import { notifyWebhook } from '@/lib/webhook'
+import { supabase, type Todo, type TodoAlert, type TodoComment } from '@/lib/supabase'
+import { notifyWebhook, notifyWebhookPayload } from '@/lib/webhook'
 
 type TodoModalProps = {
   todo: Todo
@@ -27,20 +27,34 @@ export default function TodoModal({ todo, allTodos, onClose, onSave }: TodoModal
   const [dueDate, setDueDate] = useState(todo.due_date ?? '')
   const [endDate, setEndDate] = useState(todo.end_date ?? '')
   const [estimatedTime, setEstimatedTime] = useState(todo.estimated_time ?? '')
-  const [alerts, setAlerts] = useState<{ id: string; title: string; isNew?: boolean }[]>([])
+  const [alerts, setAlerts] = useState<{ id: string; title: string; dueAt: string; isNew?: boolean }[]>([])
   const [dependencies, setDependencies] = useState<string[]>([])
+  const [comments, setComments] = useState<TodoComment[]>([])
+  const [commentInput, setCommentInput] = useState('')
+  const [savingComment, setSavingComment] = useState(false)
   const [saving, setSaving] = useState(false)
   const overlayRef = useRef<HTMLDivElement>(null)
 
   // Load alerts and dependencies
   useEffect(() => {
     async function load() {
-      const [alertsRes, depsRes] = await Promise.all([
+      const [alertsRes, depsRes, commentsRes] = await Promise.all([
         supabase.from('todo_alerts').select('*').eq('todo_id', todo.id).order('created_at'),
         supabase.from('todo_dependencies').select('depends_on_id').eq('todo_id', todo.id),
+        supabase.from('todo_comments').select('*').eq('todo_id', todo.id).order('created_at'),
       ])
-      if (alertsRes.data) setAlerts(alertsRes.data)
+      setCommentInput('')
+      if (alertsRes.data) {
+        setAlerts(
+          alertsRes.data.map((alert: TodoAlert) => ({
+            id: alert.id,
+            title: alert.title,
+            dueAt: alert.due_at ? formatLocalDateTimeInput(alert.due_at) : '',
+          }))
+        )
+      }
       if (depsRes.data) setDependencies(depsRes.data.map((d: { depends_on_id: string }) => d.depends_on_id))
+      if (commentsRes.data) setComments(commentsRes.data as TodoComment[])
     }
     load()
   }, [todo.id])
@@ -60,11 +74,15 @@ export default function TodoModal({ todo, allTodos, onClose, onSave }: TodoModal
   }
 
   function addAlert() {
-    setAlerts(prev => [...prev, { id: crypto.randomUUID(), title: '', isNew: true }])
+    setAlerts(prev => [...prev, { id: crypto.randomUUID(), title: '', dueAt: '', isNew: true }])
   }
 
   function updateAlertTitle(id: string, title: string) {
     setAlerts(prev => prev.map(a => a.id === id ? { ...a, title } : a))
+  }
+
+  function updateAlertDueAt(id: string, dueAt: string) {
+    setAlerts(prev => prev.map(a => a.id === id ? { ...a, dueAt } : a))
   }
 
   function removeAlert(id: string) {
@@ -75,6 +93,26 @@ export default function TodoModal({ todo, allTodos, onClose, onSave }: TodoModal
     setDependencies(prev =>
       prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]
     )
+  }
+
+  async function handleAddComment() {
+    const content = commentInput.trim()
+    if (!content) return
+    setSavingComment(true)
+    const { data, error } = await supabase
+      .from('todo_comments')
+      .insert({ todo_id: todo.id, content })
+      .select()
+      .single()
+    if (!error && data) {
+      setComments(prev => [...prev, data as TodoComment])
+      setCommentInput('')
+      notifyWebhookPayload('comment.created', {
+        comment: data,
+        todo: { id: todo.id, text: text.trim() },
+      })
+    }
+    setSavingComment(false)
   }
 
   async function handleSave() {
@@ -108,7 +146,11 @@ export default function TodoModal({ todo, allTodos, onClose, onSave }: TodoModal
     const validAlerts = alerts.filter(a => a.title.trim())
     if (validAlerts.length > 0) {
       await supabase.from('todo_alerts').insert(
-        validAlerts.map(a => ({ todo_id: todo.id, title: a.title.trim() }))
+        validAlerts.map(a => ({
+          todo_id: todo.id,
+          title: a.title.trim(),
+          due_at: toIsoOrNull(a.dueAt),
+        }))
       )
     }
 
@@ -130,6 +172,25 @@ export default function TodoModal({ todo, allTodos, onClose, onSave }: TodoModal
   }
 
   const otherTodos = allTodos.filter(t => t.id !== todo.id)
+
+  function toIsoOrNull(value: string) {
+    if (!value) return null
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) return null
+    return parsed.toISOString()
+  }
+
+  function formatLocalDateTimeInput(value: string) {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const yyyy = date.getFullYear()
+    const mm = pad(date.getMonth() + 1)
+    const dd = pad(date.getDate())
+    const hh = pad(date.getHours())
+    const min = pad(date.getMinutes())
+    return `${yyyy}-${mm}-${dd}T${hh}:${min}`
+  }
 
   return (
     <div className="modal-overlay" ref={overlayRef} onClick={handleOverlayClick}>
@@ -240,9 +301,51 @@ export default function TodoModal({ todo, allTodos, onClose, onSave }: TodoModal
                   placeholder="Título de la alerta"
                   autoFocus={alert.isNew}
                 />
+                <input
+                  type="datetime-local"
+                  className="modal-input modal-datetime-input"
+                  value={alert.dueAt}
+                  onChange={e => updateAlertDueAt(alert.id, e.target.value)}
+                />
                 <button className="btn-remove-alert" onClick={() => removeAlert(alert.id)} title="Eliminar">×</button>
               </div>
             ))}
+          </div>
+
+          {/* Comments */}
+          <div className="modal-section">
+            <div className="modal-section-header">
+              <label className="modal-label">Comentarios</label>
+            </div>
+            <div className="comment-input-row">
+              <input
+                type="text"
+                className="modal-input"
+                value={commentInput}
+                onChange={e => setCommentInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAddComment()}
+                placeholder="Escribe un comentario..."
+              />
+              <button
+                className="btn-add-small"
+                onClick={handleAddComment}
+                disabled={savingComment || !commentInput.trim()}
+              >
+                {savingComment ? 'Guardando...' : 'Agregar'}
+              </button>
+            </div>
+            {comments.length === 0 ? (
+              <p className="modal-empty-hint">Aun sin comentarios</p>
+            ) : (
+              <div className="comment-list">
+                {comments.map(comment => (
+                  <div key={comment.id} className="comment-item">
+                    <span className="comment-text">{comment.content}</span>
+                    <span className="comment-date">{new Date(comment.created_at).toLocaleString('es-AR')}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Dependencies */}

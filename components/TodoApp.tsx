@@ -32,6 +32,8 @@ export default function TodoApp() {
   const [loading, setLoading] = useState(true)
   const [modalTodo, setModalTodo] = useState<Todo | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null)
+  const touchHandledRef = useRef(false)
 
   useEffect(() => {
     fetchTodos()
@@ -139,6 +141,35 @@ export default function TodoApp() {
     finished: 'Finalizadas',
   }
 
+  const filterOrder: Filter[] = ['all', 'active', 'finished']
+
+  function handleSwipeChange(direction: 'left' | 'right') {
+    const currentIndex = filterOrder.indexOf(filter)
+    if (currentIndex === -1) return
+    const nextIndex = direction === 'left'
+      ? Math.min(filterOrder.length - 1, currentIndex + 1)
+      : Math.max(0, currentIndex - 1)
+    if (nextIndex !== currentIndex) setFilter(filterOrder[nextIndex])
+  }
+
+  function handleTouchStart(e: React.TouchEvent<HTMLDivElement>) {
+    if (e.touches.length !== 1) return
+    const touch = e.touches[0]
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY }
+    touchHandledRef.current = false
+  }
+
+  function handleTouchEnd(e: React.TouchEvent<HTMLDivElement>) {
+    if (!touchStartRef.current || touchHandledRef.current) return
+    const touch = e.changedTouches[0]
+    const dx = touch.clientX - touchStartRef.current.x
+    const dy = touch.clientY - touchStartRef.current.y
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+      handleSwipeChange(dx < 0 ? 'left' : 'right')
+      touchHandledRef.current = true
+    }
+  }
+
   function formatDate(d: string | null) {
     if (!d) return null
     const [y, m, day] = d.split('-')
@@ -223,7 +254,7 @@ export default function TodoApp() {
           </div>
         </div>
 
-        <div className="filters">
+        <div className="filters" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
           {(['all', 'active', 'finished'] as Filter[]).map(f => (
             <button
               key={f}

@@ -22,6 +22,15 @@ export type TodoAlert = {
   id: string
   todo_id: string
   title: string
+  due_at: string | null
+  sent_at: string | null
+  created_at: string
+}
+
+export type TodoComment = {
+  id: string
+  todo_id: string
+  content: string
   created_at: string
 }
 

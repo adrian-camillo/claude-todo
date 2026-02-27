@@ -94,6 +94,7 @@ body {
 .filters {
   display: flex; gap: 6px; margin-bottom: 16px;
   background: var(--claude-bg-warm); border-radius: var(--radius-md); padding: 4px;
+  touch-action: pan-y;
 }
 
 .filter-btn {
@@ -200,6 +201,8 @@ body {
   max-height: 90vh;
   display: flex; flex-direction: column;
   animation: slideUp 0.22s cubic-bezier(0.4,0,0.2,1);
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .modal-header {
@@ -230,6 +233,7 @@ body {
   flex: 1; overflow-y: auto;
   padding: 20px;
   display: flex; flex-direction: column; gap: 20px;
+  overflow-x: hidden;
 }
 
 .modal-footer {
@@ -289,7 +293,7 @@ body {
 }
 
 /* Dates */
-.dates-row { display: flex; gap: 10px; }
+.dates-row { display: flex; gap: 10px; flex-wrap: wrap; }
 .date-field { display: flex; flex-direction: column; gap: 4px; flex: 1; }
 .date-label { font-size: 11px; color: var(--claude-text-muted); font-weight: 500; }
 .modal-date-input {
@@ -302,7 +306,8 @@ body {
 .modal-date-input:focus { border-color: var(--claude-terracotta); }
 
 /* Alerts */
-.alert-row { display: flex; gap: 8px; align-items: center; }
+.alert-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.modal-datetime-input { min-width: 180px; flex: 1; }
 .btn-remove-alert {
   width: 28px; height: 28px; border: none; border-radius: var(--radius-sm);
   background: transparent; color: var(--claude-text-muted);
@@ -318,6 +323,20 @@ body {
   transition: background var(--transition);
 }
 .btn-add-small:hover { background: rgba(217,119,87,0.1); }
+
+/* Comments */
+.comment-input-row { display: flex; gap: 8px; align-items: center; }
+.comment-input-row .modal-input { flex: 1; min-width: 0; }
+.comment-list {
+  border: 1.5px solid var(--claude-border);
+  border-radius: var(--radius-sm);
+  background: var(--claude-bg);
+  padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.comment-item { display: flex; flex-direction: column; gap: 4px; }
+.comment-text { font-size: 13px; color: var(--claude-text); }
+.comment-date { font-size: 11px; color: var(--claude-text-muted); }
 
 /* Dependencies */
 .dep-list {
@@ -396,4 +415,7 @@ body {
   .app-container { padding: 20px 16px 16px; }
   .logo h1 { font-size: 24px; }
   .todo-actions { opacity: 1; }
+  .alert-row { flex-direction: column; align-items: stretch; }
+  .modal-datetime-input { min-width: 0; width: 100%; }
+  .comment-input-row { flex-direction: column; align-items: stretch; }
 }
